@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../components/ui/button";
 import {
   Card,
@@ -28,55 +28,59 @@ import {
   DialogTrigger,
 } from "../components/ui/dialog";
 import { Label } from "../components/ui/label";
+import api from "../axiosConfig";
 
 const DashboardPage = () => {
-  const [tasks, setTasks] = useState([
-    {
-      id: 1,
-      title: "Completar projeto de design",
-      completed: false,
-      priority: "high",
-      status: "pending",
-      duration: "2h",
-      startTime: "09:00",
-    },
-    {
-      id: 2,
-      title: "Revisar código da aplicação",
-      completed: true,
-      priority: "medium",
-      status: "completed",
-      duration: "1h 30min",
-      startTime: "11:00",
-    },
-    {
-      id: 3,
-      title: "Preparar apresentação",
-      completed: false,
-      priority: "high",
-      status: "in_progress",
-      duration: "3h",
-      startTime: "14:00",
-    },
-    {
-      id: 4,
-      title: "Responder e-mails",
-      completed: false,
-      priority: "low",
-      status: "pending",
-      duration: "30min",
-      startTime: "16:30",
-    },
-  ]);
+  const [tasks, setTasks] = useState([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTask, setNewTask] = useState({
-    title: "",
+    name: "",
     duration: "",
-    startTime: "",
+    start_time: "",
   });
 
-  const completedCount = tasks.filter((t) => t.completed).length;
+  async function fetchTasks() {
+    try {
+      const response = await api.get("/tasks");
+      setTasks(response.data);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function createTask() {
+    try {
+      await api.post("/tasks", newTask);
+      setNewTask({ name: "", duration: "", start_time: "" });
+      fetchTasks();
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
+  async function deleteTask(id) {
+    try {
+      await api.delete(`/tasks/${id}`);
+      fetchTasks();
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function completeTask(id) {
+    try {
+      await api.patch(`/tasks/${id}`, { status: "finished" });
+      fetchTasks();
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  const completedCount = tasks.filter((t) => t.status === "finished").length;
   const totalCount = tasks.length;
 
   return (
@@ -158,15 +162,16 @@ const DashboardPage = () => {
                   <Input
                     id="task-name"
                     placeholder="Digite o nome da tarefa..."
-                    value={newTask.title}
+                    value={newTask.name}
                     onChange={(e) =>
-                      setNewTask({ ...newTask, title: e.target.value })
+                      setNewTask({ ...newTask, name: e.target.value })
                     }
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="task-duration">Duração Prevista</Label>
                   <Input
+                    type="time"
                     id="task-duration"
                     placeholder="Ex: 2h, 1h 30min, 45min..."
                     value={newTask.duration}
@@ -179,10 +184,10 @@ const DashboardPage = () => {
                   <Label htmlFor="task-time">Hora Prevista (HH:mm)</Label>
                   <Input
                     id="task-time"
-                    type="time"
-                    value={newTask.startTime}
+                    type="datetime-local"
+                    value={newTask.start_time}
                     onChange={(e) =>
-                      setNewTask({ ...newTask, startTime: e.target.value })
+                      setNewTask({ ...newTask, start_time: e.target.value })
                     }
                   />
                 </div>
@@ -195,7 +200,7 @@ const DashboardPage = () => {
                   className="bg-gradient-to-r from-primary to-secondary"
                   onClick={() => {
                     setIsModalOpen(false);
-                    setNewTask({ title: "", duration: "", startTime: "" });
+                    createTask();
                   }}
                 >
                   Adicionar Tarefa
@@ -220,49 +225,36 @@ const DashboardPage = () => {
                 className="p-4 rounded-lg border bg-card/50 hover:bg-accent/5 transition-colors group"
               >
                 <div className="flex items-start gap-4">
-                  <Checkbox checked={task.completed} className="w-5 h-5 mt-1" />
-
+                  <Checkbox
+                    checked={task.status === "finished"}
+                    className="w-5 h-5 mt-1"
+                  />
                   <div className="flex-1 space-y-2">
                     <div>
                       <p
                         className={`font-medium ${
-                          task.completed
+                          task.status === "finished"
                             ? "line-through text-muted-foreground"
                             : ""
                         }`}
                       >
-                        {task.title}
+                        {task.name}
                       </p>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <span
                           className={`text-xs px-2 py-0.5 rounded-full ${
-                            task.status === "completed"
+                            task.status === "finished"
                               ? "bg-secondary/10 text-secondary"
-                              : task.status === "in_progress"
+                              : task.status === "in progress"
                               ? "bg-primary/10 text-primary"
                               : "bg-muted text-muted-foreground"
                           }`}
                         >
-                          {task.status === "completed"
+                          {task.status === "finished"
                             ? "Concluída"
-                            : task.status === "in_progress"
+                            : task.status === "in progress"
                             ? "Em Andamento"
                             : "Pendente"}
-                        </span>
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
-                            task.priority === "high"
-                              ? "bg-destructive/10 text-destructive"
-                              : task.priority === "medium"
-                              ? "bg-accent/10 text-accent"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          {task.priority === "high"
-                            ? "Alta"
-                            : task.priority === "medium"
-                            ? "Média"
-                            : "Baixa"}
                         </span>
                       </div>
                     </div>
@@ -274,27 +266,48 @@ const DashboardPage = () => {
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="font-medium">Início:</span>
-                        <span>{task.startTime}</span>
+                        <span>
+                          {new Date(task.start_time).toLocaleTimeString(
+                            "pt-BR",
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }
+                          )}
+                        </span>
                       </div>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    {task.status === "pending" && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
                       <Button
+                        disabled={
+                          task.status === "finished" ||
+                          task.status === "in progress"
+                        }
                         size="sm"
-                        className="gap-2 bg-gradient-to-r from-primary to-secondary"
+                        className="gap-2 disabled:cursor-not-allowed"
                       >
                         <Play className="w-4 h-4" />
                         Iniciar
                       </Button>
-                    )}
+
+                      <Button
+                        onClick={() => deleteTask(task.id)}
+                        variant="ghost"
+                        size="icon"
+                        className="transition-opacity text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      className="transition-opacity text-destructive"
+                      disabled={task.status === "finished"}
+                      size="lg"
+                      variant="default"
+                      onClick={() => completeTask(task.id)}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      Concluir
                     </Button>
                   </div>
                 </div>
