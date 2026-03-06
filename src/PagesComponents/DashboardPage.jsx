@@ -17,7 +17,11 @@ import {
   Circle,
   Clock,
   Play,
+  ListTodo,
+  Pencil,
 } from "lucide-react";
+import { ThemeToggle } from "../components/ThemeToggle";
+import { useTheme } from "../contexts/ThemeContext";
 import { logout, withAuth } from "../auth";
 import {
   Dialog,
@@ -32,6 +36,7 @@ import api from "../axiosConfig";
 import * as echarts from "echarts";
 
 const DashboardPage = () => {
+  const { theme } = useTheme();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -40,7 +45,35 @@ const DashboardPage = () => {
     name: "",
     start_date: "",
     end_date: "",
+    recurrence_days: [],
   });
+  const [allTasks, setAllTasks] = useState([]);
+  const [isAllTasksModalOpen, setIsAllTasksModalOpen] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    start_date: "",
+    end_date: "",
+    recurrence_days: [],
+  });
+  const WEEK_DAYS = [
+    { value: 0, letter: "D", label: "Domingo" },
+    { value: 1, letter: "S", label: "Segunda" },
+    { value: 2, letter: "T", label: "Terça" },
+    { value: 3, letter: "Q", label: "Quarta" },
+    { value: 4, letter: "Q", label: "Quinta" },
+    { value: 5, letter: "S", label: "Sexta" },
+    { value: 6, letter: "S", label: "Sábado" },
+  ];
+
+  function toggleRecurrenceDay(dayValue) {
+    setNewTask((prev) => ({
+      ...prev,
+      recurrence_days: prev.recurrence_days.includes(dayValue)
+        ? prev.recurrence_days.filter((d) => d !== dayValue)
+        : [...prev.recurrence_days, dayValue].sort((a, b) => a - b),
+    }));
+  }
 
   async function fetchTasks() {
     try {
@@ -57,9 +90,12 @@ const DashboardPage = () => {
         name: newTask.name,
         start_date: newTask.start_date || null,
         end_date: newTask.end_date || null,
+        recurrence_days: newTask.recurrence_days?.length
+          ? newTask.recurrence_days
+          : undefined,
       };
       await api.post("/tasks", payload);
-      setNewTask({ name: "", start_date: "", end_date: "" });
+      setNewTask({ name: "", start_date: "", end_date: "", recurrence_days: [] });
       fetchTasks();
       getHeatmap();
     } catch (error) {
@@ -78,6 +114,7 @@ const DashboardPage = () => {
   useEffect(() => {
     fetchTasks();
     getHeatmap()
+    getAllTasks();
   }, []);
 
   async function deleteTask(id) {
@@ -124,7 +161,55 @@ const DashboardPage = () => {
   }
 
 
-  const completedCount = tasks.filter((t) => t.status === "finished").length;
+  async function getAllTasks() {
+    try {
+      const result = await api.get("/tasks/all");
+      setAllTasks(result.data);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function updateTask(id, payload) {
+    try {
+      await api.patch(`/tasks/${id}`, {
+        name: payload.name,
+        start_date: payload.start_date || null,
+        end_date: payload.end_date || null,
+        recurrence_days: payload.recurrence_days?.length
+          ? payload.recurrence_days
+          : undefined,
+      });
+      fetchTasks();
+      getHeatmap();
+      getAllTasks();
+      setEditingTaskId(null);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  function startEditingTask(task) {
+    setEditingTaskId(task.id);
+    setEditForm({
+      name: task.name,
+      start_date: task.start_date ? task.start_date.slice(0, 10) : "",
+      end_date: task.end_date ? task.end_date.slice(0, 10) : "",
+      recurrence_days: task.recurrence_days ?? [],
+    });
+  }
+
+  function cancelEditingTask() {
+    setEditingTaskId(null);
+  }
+
+  async function handleDeleteFromAllTasks(id) {
+    await deleteTask(id);
+    getAllTasks();
+  }
+
+
+  const completedCount = tasks.filter((t) => t.completed_today).length;
   const totalCount = tasks.length;
 
   const heatmapRef = useRef(null);
@@ -132,7 +217,7 @@ const DashboardPage = () => {
   useEffect(() => {
     if (!heatmapRef.current || !heatmap?.length) return;
 
-    const chart = echarts.init(heatmapRef.current);
+    const chart = echarts.init(heatmapRef.current, theme === "dark" ? "dark" : null);
 
     const heatmapData = heatmap.map((item) => {
       const value =
@@ -149,6 +234,11 @@ const DashboardPage = () => {
           new Date().toISOString().slice(0, 10),
         ];
 
+    const isDark = theme === "dark";
+    const visualMapColors = isDark
+      ? { color: ["#4b5563", "#22c55e"] }
+      : { color: ["#e0e0e0", "#22c55e"] };
+
     const option = {
       tooltip: {
         formatter: (params) => {
@@ -163,7 +253,7 @@ const DashboardPage = () => {
         min: 0,
         max: 100,
         type: "continuous",
-        inRange: { color: ["#e0e0e0", "#22c55e"] },
+        inRange: visualMapColors,
       },
       calendar: {
         range,
@@ -189,7 +279,7 @@ const DashboardPage = () => {
       chart.dispose();
       window.removeEventListener("resize", handleResize);
     };
-  }, [heatmap]);
+  }, [heatmap, theme]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
@@ -207,15 +297,18 @@ const DashboardPage = () => {
               </p>
             </div>
           </div>
-          <Button
-            onClick={() => logout()}
-            variant="ghost"
-            size="sm"
-            className="gap-2"
-          >
-            <LogOut className="w-4 h-4" />
-            Sair
-          </Button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button
+              onClick={() => logout()}
+              variant="ghost"
+              size="sm"
+              className="gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              Sair
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -224,7 +317,7 @@ const DashboardPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5">
             <CardHeader className="pb-3">
-              <CardDescription>Total de Tarefas</CardDescription>
+              <CardDescription>Tarefas de hoje</CardDescription>
               <CardTitle className="text-3xl">{totalCount}</CardTitle>
             </CardHeader>
           </Card>
@@ -232,7 +325,7 @@ const DashboardPage = () => {
           <Card className="border-secondary/20 bg-gradient-to-br from-card to-secondary/5">
             <CardHeader className="pb-3">
               <CardDescription>Concluídas</CardDescription>
-              <CardTitle className="text-3xl text-secondary">
+              <CardTitle className="text-3xl text-green-500">
                 {completedCount}
               </CardTitle>
             </CardHeader>
@@ -253,11 +346,11 @@ const DashboardPage = () => {
             <div ref={heatmapRef} className="w-full h-[180px]" />
           </CardContent>
         </Card>
-        {/* Add Task Button */}
-        <div className="mb-6">
+        {/* Add Task + All Tasks Buttons */}
+        <div className="mb-6 flex flex-wrap gap-3">
           <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2 bg-primary  hover:opacity-90">
+              <Button className="gap-2 bg-primary hover:opacity-90">
                 <Plus className="w-4 h-4" />
                 Nova Tarefa
               </Button>
@@ -303,13 +396,36 @@ const DashboardPage = () => {
                     }
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>Dias da semana</Label>
+                  <div className="flex gap-2 flex-wrap">
+                    {WEEK_DAYS.map((day) => {
+                      const isSelected = newTask.recurrence_days?.includes(
+                        day.value
+                      );
+                      return (
+                        <Button
+                          key={day.value}
+                          type="button"
+                          variant={isSelected ? "default" : "outline"}
+                          size="icon"
+                          title={day.label}
+                          onClick={() => toggleRecurrenceDay(day.value)}
+                          className="shrink-0"
+                        >
+                          {day.letter}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setIsModalOpen(false)}>
                   Cancelar
                 </Button>
                 <Button
-                  className="bg-gradient-to-r from-primary to-secondary"
+                  className="bg-primary"
                   onClick={() => {
                     setIsModalOpen(false);
                     createTask();
@@ -320,12 +436,179 @@ const DashboardPage = () => {
               </div>
             </DialogContent>
           </Dialog>
+
+          <Dialog
+            open={isAllTasksModalOpen}
+            onOpenChange={(open) => {
+              setIsAllTasksModalOpen(open);
+              if (open) getAllTasks();
+              if (!open) setEditingTaskId(null);
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <ListTodo className="w-4 h-4" />
+                Ver todas as tarefas
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Todas as tarefas</DialogTitle>
+                <DialogDescription>
+                  Visualize, edite ou exclua suas tarefas. Clique em Editar para alterar os dados.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="overflow-y-auto flex-1 min-h-0 space-y-3 pr-2 -mr-2">
+                {allTasks.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Nenhuma tarefa cadastrada.
+                  </div>
+                )}
+                {allTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="p-4 rounded-lg border bg-card space-y-3"
+                  >
+                    {editingTaskId === task.id ? (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor={`edit-name-${task.id}`}>Nome</Label>
+                          <Input
+                            id={`edit-name-${task.id}`}
+                            value={editForm.name}
+                            onChange={(e) =>
+                              setEditForm((f) => ({ ...f, name: e.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-2">
+                            <Label htmlFor={`edit-start-${task.id}`}>Início</Label>
+                            <Input
+                              id={`edit-start-${task.id}`}
+                              type="date"
+                              value={editForm.start_date}
+                              onChange={(e) =>
+                                setEditForm((f) => ({ ...f, start_date: e.target.value }))
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`edit-end-${task.id}`}>Término</Label>
+                            <Input
+                              id={`edit-end-${task.id}`}
+                              type="date"
+                              value={editForm.end_date}
+                              onChange={(e) =>
+                                setEditForm((f) => ({ ...f, end_date: e.target.value }))
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Dias da semana</Label>
+                          <div className="flex gap-2 flex-wrap">
+                            {WEEK_DAYS.map((day) => {
+                              const isSelected = editForm.recurrence_days?.includes(day.value);
+                              return (
+                                <Button
+                                  key={day.value}
+                                  type="button"
+                                  variant={isSelected ? "default" : "outline"}
+                                  size="icon"
+                                  title={day.label}
+                                  onClick={() =>
+                                    setEditForm((f) => ({
+                                      ...f,
+                                      recurrence_days: isSelected
+                                        ? f.recurrence_days.filter((d) => d !== day.value)
+                                        : [...(f.recurrence_days || []), day.value].sort((a, b) => a - b),
+                                    }))
+                                  }
+                                  className="shrink-0"
+                                >
+                                  {day.letter}
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            size="sm"
+                            onClick={() => updateTask(task.id, editForm)}
+                          >
+                            Salvar
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={cancelEditingTask}>
+                            Cancelar
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-medium">{task.name}</p>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap text-sm text-muted-foreground">
+                              {task.start_date && (
+                                <span>
+                                  Início:{" "}
+                                  {new Date(task.start_date).toLocaleDateString("pt-BR", {
+                                    timeZone: "UTC",
+                                  })}
+                                </span>
+                              )}
+                              {task.end_date && (
+                                <span>
+                                  Término:{" "}
+                                  {new Date(task.end_date).toLocaleDateString("pt-BR", {
+                                    timeZone: "UTC",
+                                  })}
+                                </span>
+                              )}
+                              {task.recurrence_days?.length > 0 && (
+                                <span>
+                                  Dias:{" "}
+                                  {task.recurrence_days
+                                    .map((d) => WEEK_DAYS.find((w) => w.value === d)?.letter ?? d)
+                                    .join(", ")}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => startEditingTask(task)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => handleDeleteFromAllTasks(task.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Tasks List */}
         <Card className="border-primary/20 shadow-lg">
           <CardHeader>
-            <CardTitle>Suas Tarefas</CardTitle>
+            <CardTitle>Tarefas de hoje</CardTitle>
             <CardDescription>
               {completedCount} de {totalCount} tarefas concluídas
             </CardDescription>
@@ -334,7 +617,7 @@ const DashboardPage = () => {
             {tasks.map((task) => (
               <div
                 key={task.id}
-                className="p-4 rounded-lg border bg-card/50 hover:bg-accent/5 transition-colors group"
+                className="p-4 rounded-lg border border-primary bg-card hover:bg-accent/5 transition-colors group"
               >
                 <div className="flex items-start gap-4">
                   <div className="flex-1 space-y-2">
