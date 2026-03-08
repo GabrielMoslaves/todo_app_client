@@ -598,6 +598,11 @@ const DashboardPage = () => {
                         </div>
                       </>
                     )}
+                    {task.total_recurrences != null && (
+                      <p className="text-sm text-muted-foreground pt-2 border-t mt-2">
+                        {task.completion_count ?? 0} concluídas / {task.total_recurrences} total
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
