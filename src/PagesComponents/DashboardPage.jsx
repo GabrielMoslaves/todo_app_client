@@ -8,15 +8,12 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
-import { Checkbox } from "../components/ui/checkbox";
 import {
   Plus,
   Trash2,
   LogOut,
   CheckCircle2,
   Circle,
-  Clock,
-  Play,
   ListTodo,
   Pencil,
 } from "lucide-react";
@@ -50,6 +47,10 @@ const DashboardPage = () => {
   const [allTasks, setAllTasks] = useState([]);
   const [isAllTasksModalOpen, setIsAllTasksModalOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState(null);
+  const [isDayModalOpen, setIsDayModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [dayTasks, setDayTasks] = useState([]);
+  const [loadingDayTasks, setLoadingDayTasks] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
     start_date: "",
@@ -111,6 +112,20 @@ const DashboardPage = () => {
     }
   }
 
+  async function fetchTasksByDate(date) {
+    if (!date) return;
+    setLoadingDayTasks(true);
+    try {
+      const response = await api.get("/tasks", { params: { date } });
+      setDayTasks(response.data ?? []);
+    } catch (e) {
+      console.error(e);
+      setDayTasks([]);
+    } finally {
+      setLoadingDayTasks(false);
+    }
+  }
+
   useEffect(() => {
     fetchTasks();
     getHeatmap()
@@ -126,37 +141,49 @@ const DashboardPage = () => {
     }
   }
 
-  async function completeTask(id) {
-    setLoading(true)
+  async function completeTask(id, forDate) {
+    setLoading(true);
     try {
-      await api.post(`/tasks/${id}/complete`);
-      fetchTasks();
-      getHeatmap();
+      const body = forDate ? { date: forDate } : {};
+      await api.post(`/tasks/${id}/complete`, body);
+      if (forDate) {
+        await fetchTasksByDate(forDate);
+        getHeatmap();
+      } else {
+        fetchTasks();
+        getHeatmap();
+      }
     } catch (error) {
       console.error(error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
-  async function uncompleteTask(id) {
-    setLoading(true)
+  async function uncompleteTask(id, forDate) {
+    setLoading(true);
     try {
-      await api.delete(`/tasks/${id}/complete`);
-      fetchTasks();
-      getHeatmap();
+      const config = forDate ? { data: { date: forDate } } : {};
+      await api.delete(`/tasks/${id}/complete`, config);
+      if (forDate) {
+        await fetchTasksByDate(forDate);
+        getHeatmap();
+      } else {
+        fetchTasks();
+        getHeatmap();
+      }
     } catch (error) {
-      console.error(error)
+      console.error(error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
-  function handleClick(completed, id) {
+  function handleClick(completed, id, forDate) {
     if (completed) {
-      uncompleteTask(id)
+      uncompleteTask(id, forDate);
     } else {
-      completeTask(id)
+      completeTask(id, forDate);
     }
   }
 
@@ -272,10 +299,20 @@ const DashboardPage = () => {
 
     chart.setOption(option);
 
+    const handleCellClick = (params) => {
+      const date = params?.data?.[0];
+      if (!date) return;
+      setSelectedDate(date);
+      setIsDayModalOpen(true);
+      fetchTasksByDate(date);
+    };
+    chart.on("click", handleCellClick);
+
     const handleResize = () => chart.resize();
     window.addEventListener("resize", handleResize);
 
     return () => {
+      chart.off("click", handleCellClick);
       chart.dispose();
       window.removeEventListener("resize", handleResize);
     };
@@ -283,7 +320,6 @@ const DashboardPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -313,7 +349,6 @@ const DashboardPage = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5">
             <CardHeader className="pb-3">
@@ -346,7 +381,69 @@ const DashboardPage = () => {
             <div ref={heatmapRef} className="w-full h-[180px]" />
           </CardContent>
         </Card>
-        {/* Add Task + All Tasks Buttons */}
+
+        <Dialog
+          open={isDayModalOpen}
+          onOpenChange={(open) => {
+            setIsDayModalOpen(open);
+            if (!open) {
+              setSelectedDate(null);
+              setDayTasks([]);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle>
+                Tarefas do dia
+                {selectedDate &&
+                  ` (${new Date(selectedDate + "T12:00:00").toLocaleDateString("pt-BR", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                  })})`}
+              </DialogTitle>
+              <DialogDescription>
+                Clique em Concluir ou Desfazer para atualizar o status.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto space-y-2 pr-1">
+              {loadingDayTasks ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  Carregando…
+                </div>
+              ) : dayTasks.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  Nenhuma tarefa neste dia.
+                </div>
+              ) : (
+                dayTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card"
+                  >
+                    <span
+                      className={`flex-1 min-w-0 truncate ${task.completed_today ? "line-through text-muted-foreground" : "font-medium"}`}
+                    >
+                      {task.name}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant={task.completed_today ? "outline" : "default"}
+                      disabled={loading}
+                      onClick={() =>
+                        handleClick(task.completed_today, task.id, selectedDate)
+                      }
+                    >
+                      {task.completed_today ? "Desfazer" : "Concluir"}
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <div className="mb-6 flex flex-wrap gap-3">
           <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
             <DialogTrigger asChild>
