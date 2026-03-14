@@ -17,15 +17,29 @@ import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { useState } from "react";
 import { login } from "../auth";
+import api from "../axiosConfig";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleSubmit = async (e) => {
+  const handleSubmitLogin = async (e) => {
     e.preventDefault();
     await login({ email, password });
   };
+
+  const handleSubmitSignUp = async (e) => {
+    try {
+      e.preventDefault()
+      const result = await api.post("/users", { email, password })
+      if (result.status === 201) {
+        await login({ email, password })
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4">
@@ -57,7 +71,7 @@ export default function LoginPage() {
               </TabsList>
 
               <TabsContent value="login" className="space-y-4">
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmitLogin} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="login-email">E-mail</Label>
                     <Input
@@ -91,27 +105,15 @@ export default function LoginPage() {
               </TabsContent>
 
               <TabsContent value="signup" className="space-y-4">
-                <form onSubmit={() => {}} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name">Nome</Label>
-                    <Input
-                      id="signup-name"
-                      type="text"
-                      placeholder="Seu nome"
-                      value={""}
-                      onChange={() => {}}
-                      required
-                      className="transition-all focus:scale-[1.01]"
-                    />
-                  </div>
+                <form onSubmit={handleSubmitSignUp} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">E-mail</Label>
                     <Input
+                      value={email}
                       id="signup-email"
                       type="email"
                       placeholder="seu@email.com"
-                      value={""}
-                      onChange={() => {}}
+                      onChange={(e) => setEmail(e.target.value)}
                       required
                       className="transition-all focus:scale-[1.01]"
                     />
@@ -122,8 +124,8 @@ export default function LoginPage() {
                       id="signup-password"
                       type="password"
                       placeholder="••••••••"
-                      value={""}
-                      onChange={() => {}}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       required
                       className="transition-all focus:scale-[1.01]"
                     />

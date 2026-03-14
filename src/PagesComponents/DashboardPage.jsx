@@ -16,6 +16,9 @@ import {
   Circle,
   ListTodo,
   Pencil,
+  CalendarDays,
+  Repeat,
+  Activity,
 } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useTheme } from "../contexts/ThemeContext";
@@ -263,10 +266,11 @@ const DashboardPage = () => {
 
     const isDark = theme === "dark";
     const visualMapColors = isDark
-      ? { color: ["#4b5563", "#22c55e"] }
+      ? { color: ["#161a2b", "#22c55e"] }
       : { color: ["#e0e0e0", "#22c55e"] };
 
     const option = {
+      backgroundColor: "transparent",
       tooltip: {
         formatter: (params) => {
           const item = heatmap.find((h) => h.date === params.data[0]);
@@ -287,6 +291,23 @@ const DashboardPage = () => {
         cellSize: ["auto", 20],
         left: "center",
         top: 30,
+        itemStyle: {
+          color: isDark ? "#020617" : "#a3a29f",
+          borderWidth: 1,
+          borderColor: isDark ? "#4f5361" : "#a3a29f",
+        },
+        splitLine: {
+          show: false,
+        },
+        yearLabel: {
+          color: isDark ? "#9ca3af" : "#6b7280",
+        },
+        dayLabel: {
+          color: isDark ? "#6b7280" : "#9ca3af",
+        },
+        monthLabel: {
+          color: isDark ? "#9ca3af" : "#6b7280",
+        },
       },
       series: [
         {
@@ -357,7 +378,7 @@ const DashboardPage = () => {
             </CardHeader>
           </Card>
 
-          <Card className="border-secondary/20 bg-gradient-to-br from-card to-secondary/5">
+          <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5">
             <CardHeader className="pb-3">
               <CardDescription>Concluídas</CardDescription>
               <CardTitle className="text-3xl text-green-500">
@@ -366,17 +387,17 @@ const DashboardPage = () => {
             </CardHeader>
           </Card>
 
-          <Card className="border-accent/20 bg-gradient-to-br from-card to-accent/5">
+          <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5">
             <CardHeader className="pb-3">
               <CardDescription>Pendentes</CardDescription>
-              <CardTitle className="text-3xl text-accent">
+              <CardTitle className="text-3xl">
                 {totalCount - completedCount}
               </CardTitle>
             </CardHeader>
           </Card>
         </div>
 
-        <Card className="mb-6 border-primary/20">
+        <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5 mb-8">
           <CardContent>
             <div ref={heatmapRef} className="w-full h-[180px]" />
           </CardContent>
@@ -508,7 +529,11 @@ const DashboardPage = () => {
                           size="icon"
                           title={day.label}
                           onClick={() => toggleRecurrenceDay(day.value)}
-                          className="shrink-0"
+                          className={`shrink-0 rounded-full text-xs font-medium ${
+                            isSelected
+                              ? "bg-emerald-500 text-emerald-50 hover:bg-emerald-500/90"
+                              : "bg-muted text-muted-foreground hover:bg-muted/80"
+                          }`}
                         >
                           {day.letter}
                         </Button>
@@ -548,23 +573,37 @@ const DashboardPage = () => {
                 Ver todas as tarefas
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col">
-              <DialogHeader>
-                <DialogTitle>Todas as tarefas</DialogTitle>
-                <DialogDescription>
-                  Visualize, edite ou exclua suas tarefas. Clique em Editar para alterar os dados.
+            <DialogContent className="sm:max-w-[720px] max-h-[85vh] flex flex-col from-card to-primary border-primary">
+              <DialogHeader className="pb-4 border-b border-border/40">
+                <DialogTitle className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2">
+                    <ListTodo className="w-5 h-5 text-primary" />
+                    <span>Todas as tarefas</span>
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                    {allTasks.length} tarefas cadastradas
+                  </span>
+                </DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground mt-2">
+                  <span className="block">
+                    Use esta visão para ter um panorama geral.
+                  </span>
                 </DialogDescription>
               </DialogHeader>
-              <div className="overflow-y-auto flex-1 min-h-0 space-y-3 pr-2 -mr-2">
+              <div className="overflow-y-auto flex-1 min-h-0 space-y-3 pr-2 -mr-2 pt-3">
                 {allTasks.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    Nenhuma tarefa cadastrada.
+                  <div className="text-center py-10 text-muted-foreground">
+                    Nenhuma tarefa cadastrada ainda.
+                    <p className="text-sm text-muted-foreground/70">
+                      Crie sua primeira tarefa para ver o resumo aqui.
+                    </p>
                   </div>
                 )}
                 {allTasks.map((task) => (
                   <div
                     key={task.id}
-                    className="p-4 rounded-lg border bg-card space-y-3"
+                    className="p-4 rounded-xl border bg-card/80 backdrop-blur-sm space-y-3 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
                   >
                     {editingTaskId === task.id ? (
                       <>
@@ -622,7 +661,11 @@ const DashboardPage = () => {
                                         : [...(f.recurrence_days || []), day.value].sort((a, b) => a - b),
                                     }))
                                   }
-                                  className="shrink-0"
+                                  className={`shrink-0 rounded-full text-xs font-medium ${
+                                    isSelected
+                                      ? "bg-emerald-500 text-emerald-50 hover:bg-emerald-500/90"
+                                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                  }`}
                                 >
                                   {day.letter}
                                 </Button>
@@ -644,29 +687,33 @@ const DashboardPage = () => {
                       </>
                     ) : (
                       <>
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-medium">{task.name}</p>
-                            <div className="flex items-center gap-2 mt-1 flex-wrap text-sm text-muted-foreground">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-base leading-snug truncate">
+                              {task.name}
+                            </p>
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                               {task.start_date && (
-                                <span>
-                                  Início:{" "}
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
+                                  <CalendarDays className="w-3 h-3" />
+                                  Início:&nbsp;
                                   {new Date(task.start_date).toLocaleDateString("pt-BR", {
                                     timeZone: "UTC",
                                   })}
                                 </span>
                               )}
                               {task.end_date && (
-                                <span>
-                                  Término:{" "}
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
+                                  <CalendarDays className="w-3 h-3" />
+                                  Término:&nbsp;
                                   {new Date(task.end_date).toLocaleDateString("pt-BR", {
                                     timeZone: "UTC",
                                   })}
                                 </span>
                               )}
                               {task.recurrence_days?.length > 0 && (
-                                <span>
-                                  Dias:{" "}
+                                <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200">
+                                  <Repeat className="w-3 h-3" />
                                   {task.recurrence_days
                                     .map((d) => WEEK_DAYS.find((w) => w.value === d)?.letter ?? d)
                                     .join(", ")}
@@ -674,7 +721,7 @@ const DashboardPage = () => {
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex items-start justify-end gap-1 shrink-0">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -696,9 +743,45 @@ const DashboardPage = () => {
                       </>
                     )}
                     {task.total_recurrences != null && (
-                      <p className="text-sm text-muted-foreground pt-2 border-t mt-2">
-                        {task.completion_count ?? 0} concluídas / {task.total_recurrences} total
-                      </p>
+                      <div className="pt-2 border-t mt-2">
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
+                          <span className="inline-flex items-center gap-1">
+                            <Activity className="w-3 h-3 text-emerald-500" />
+                            <span>
+                              <span className="font-semibold">
+                                {task.completion_count ?? 0}
+                              </span>{" "}
+                              de{" "}
+                              <span className="font-semibold">
+                                {task.total_recurrences}
+                              </span>{" "}
+                              ocorrências concluídas
+                            </span>
+                          </span>
+                          <span className="hidden md:inline-flex items-center gap-1 text-[11px] rounded-full bg-muted px-2 py-0.5">
+                            Visão histórica
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full rounded-full bg-muted/70 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-primary"
+                            style={{
+                              width: `${
+                                task.total_recurrences
+                                  ? Math.min(
+                                      100,
+                                      Math.round(
+                                        ((task.completion_count ?? 0) /
+                                          task.total_recurrences) *
+                                          100
+                                      )
+                                    )
+                                  : 0
+                              }%`,
+                            }}
+                          />
+                        </div>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -708,73 +791,133 @@ const DashboardPage = () => {
         </div>
 
         {/* Tasks List */}
-        <Card className="border-primary/20 shadow-lg">
-          <CardHeader>
-            <CardTitle>Tarefas de hoje</CardTitle>
-            <CardDescription>
-              {completedCount} de {totalCount} tarefas concluídas
-            </CardDescription>
+        <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5">
+          <CardHeader className="flex flex-col gap-1">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                  <span>Tarefas de hoje</span>
+                </CardTitle>
+                <CardDescription>
+                  {completedCount} de {totalCount} tarefas concluídas
+                </CardDescription>
+              </div>
+              {totalCount > 0 && (
+                <div className="hidden sm:flex flex-col items-end gap-1 text-xs text-muted-foreground w-40">
+                  <div className="flex justify-between w-full">
+                    <span>Progresso do dia</span>
+                    <span className="font-semibold">
+                      {Math.round((completedCount / totalCount) * 100) || 0}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-primary"
+                      style={{
+                        width: `${
+                          totalCount
+                            ? Math.min(
+                                100,
+                                Math.round((completedCount / totalCount) * 100)
+                              )
+                            : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {tasks.map((task) => (
               <div
                 key={task.id}
-                className="p-4 rounded-lg border border-primary bg-card hover:bg-accent/5 transition-colors group"
+                className="p-4 rounded-xl border bg-card/90 transition-colors group shadow-sm"
               >
                 <div className="flex items-start gap-4">
+                  <div className="mt-1">
+                    {task.completed_today ? (
+                      <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                        <CheckCircle2 className="w-5 h-5" />
+                      </div>
+                    ) : (
+                      <div className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground">
+                        <Circle className="w-4 h-4" />
+                      </div>
+                    )}
+                  </div>
                   <div className="flex-1 space-y-2">
                     <div>
                       <p
-                        className={`font-medium ${task.status === "finished"
-                          ? "line-through text-muted-foreground"
-                          : ""
-                          }`}
+                        className={`font-semibold ${
+                          task.status === "finished" || task.completed_today
+                            ? "line-through text-muted-foreground"
+                            : ""
+                        }`}
                       >
                         {task.name}
                       </p>
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <div className="mt-1 flex items-center gap-2 flex-wrap">
                         <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${task.completed_today
-                            ? "bg-primary/30 text-primary"
-                            : "bg-muted text-muted-foreground"
-                            }`}
+                          className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full ${
+                            task.completed_today
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
+                              : "bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
+                          }`}
                         >
-                          {task.completed_today
-                            ? "Concluída"
-                            : task.status === "in progress"
-                              ? "Concluída"
-                              : "Pendente"}
+                          {task.completed_today ? (
+                            <>
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Concluída hoje</span>
+                            </>
+                          ) : (
+                            <>
+                              <Circle className="w-3 h-3" />
+                              <span>Pendente</span>
+                            </>
+                          )}
                         </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <span className="font-medium">Início:</span>
-                        <span>
+                        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          <CalendarDays className="w-3 h-3" />
                           {new Date(task.start_date).toLocaleDateString("pt-BR", {
                             timeZone: "UTC",
                           })}
                         </span>
                       </div>
                     </div>
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-end gap-2 mb-2">
-                      <Button
-                        onClick={() => deleteTask(task.id)}
-                        variant="ghost"
-                        size="icon"
-                        className="transition-opacity text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                    <div className="pt-1">
+                      <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+                        <span>Progresso da tarefa</span>
+                        <span className="font-semibold">
+                          {task.completed_today ? "100%" : "0%"}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={`h-full rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-primary transition-all duration-300 ${
+                            task.completed_today ? "w-full" : "w-0"
+                          }`}
+                        />
+                      </div>
                     </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <Button
+                      onClick={() => deleteTask(task.id)}
+                      variant="ghost"
+                      size="icon"
+                      className="transition-opacity text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                     <Button
                       disabled={loading}
-                      size="lg"
-                      variant="default"
+                      size="sm"
+                      variant={task.completed_today ? "outline" : "default"}
                       onClick={() => handleClick(task.completed_today, task.id)}
+                      className="mt-1"
                     >
                       {task.completed_today ? "Desfazer" : "Concluir"}
                     </Button>
