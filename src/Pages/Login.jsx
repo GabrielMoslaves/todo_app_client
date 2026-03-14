@@ -35,7 +35,7 @@ export default function LoginPage() {
             <CheckSquare className="w-8 h-8 text-primary-foreground" />
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            TaskFlow
+            LifeHub
           </h1>
           <p className="text-muted-foreground mt-2">
             Organize suas tarefas com eficiência
